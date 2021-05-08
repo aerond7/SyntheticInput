@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "SyntheticInput": {
+      "commandName": "Project",
+      "remoteDebugEnabled": false
+    }
+  }
+}

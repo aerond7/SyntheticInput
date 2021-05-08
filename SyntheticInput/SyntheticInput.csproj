@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>netcoreapp3.1</TargetFramework>
+    <SignAssembly>false</SignAssembly>
+    <AssemblyOriginatorKeyFile>aerond.pfx</AssemblyOriginatorKeyFile>
+    <Authors>aerond</Authors>
+    <Company>aerond</Company>
+    <Description>.NET library for simulating keyboard inputs into a running process without the need for the process to be focused.</Description>
+    <Copyright>© aerond 2021</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Folder Include="Core\Objects\" />
+  </ItemGroup>
+
+</Project>
