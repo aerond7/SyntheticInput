@@ -8,6 +8,9 @@ namespace SyntheticInput.Core
 {
     public class KeystrokeProcessor
     {
+        // List of symbol characters --- MOVE THIS TO A JSON INSTEAD
+        private char[] symbolCharacters = { '!', ':', '|', '(', ')', '{', '}', '"', '<', '>', '?', '_', '+', '@', '#', '$', '%', '^', '&', '*' };
+
         // Enums
         private enum CapsLockState
         {
@@ -66,8 +69,8 @@ namespace SyntheticInput.Core
             }
 
             // Toggle the caps lock key
-            keybd_event(0x14, 0x45, KEYEVENTF_EXTENDEDKEY, (UIntPtr)0);
-            keybd_event(0x14, 0x45, KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, (UIntPtr)0);
+            keybd_event((int)VirtualKeys.CapsLock, (byte)MapVirtualKey((int)VirtualKeys.CapsLock, 0), KEYEVENTF_EXTENDEDKEY, (UIntPtr)0);
+            keybd_event((int)VirtualKeys.CapsLock, (byte)MapVirtualKey((int)VirtualKeys.CapsLock, 0), KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, (UIntPtr)0);
 
             return Task.CompletedTask;
         }
@@ -88,14 +91,31 @@ namespace SyntheticInput.Core
 
         private Task<bool> IsSymbol(char c)
         {
-            return Task.FromResult(
-                c == '!' ||
-                c == ':' ||
-                c == '|');
+            // Check if the character is a specific symbol
+            // NOTE: In the future this should be checked via a list that's loaded from a json config file rather than hard-coding the characters
+            bool isSymbol = false;
+            foreach (var symbol in symbolCharacters)
+            {
+                if (c == symbol)
+                {
+                    isSymbol = true;
+                    break;
+                }
+            }
+
+            return Task.FromResult(isSymbol);
         }
 
         // Public methods
-        public async Task ProcessKeystroke(char c)
+        public async Task SendKeystroke(VirtualKeys key)
+        {
+            // Send the character keystroke to the process
+            PostMessage(_settings.Process.MainWindowHandle, WM_KEYDOWN, (int)key, 0);
+            // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called in a loop)
+            await Task.Delay(_settings.DelayBetweenKeyPresses);
+        }
+
+        public async Task SendKeystroke(char c)
         {
             // Check if the character is capital and if it's a symbol
             bool isUpper = char.IsUpper(c);
@@ -115,7 +135,7 @@ namespace SyntheticInput.Core
                 await SetShiftState(ShiftState.Released);
             // Turn off caps lock
             await SetCapslockState(CapsLockState.OFF);
-            // Delay between keystrokes, ensures that the string is written out correctly as it was requested
+            // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called in a loop)
             await Task.Delay(_settings.DelayBetweenKeyPresses);
         }
     }

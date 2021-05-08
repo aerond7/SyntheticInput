@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Threading.Tasks;
 using SyntheticInput;
 using SyntheticInput.Core;
 
@@ -19,7 +20,13 @@ namespace SyntheticInputTesting
                 Process = ProcessHelper.GetProcessByName("TheIsleClient-Win64-Shipping")
             });
 
-            await input.Write("/announce Welcome to DINO WORLD! | Join our Discord: https://discord.gg/dinoworld");
+            Console.WriteLine("Input string:");
+            string str = Console.ReadLine();
+            await input.WriteString(str);
+
+            await Task.Delay(1000);
+
+            await input.SendKeystroke(VirtualKeys.Return);
         }
     }
 }

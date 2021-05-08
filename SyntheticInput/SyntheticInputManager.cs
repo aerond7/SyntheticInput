@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Diagnostics;
+using System.IO;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SyntheticInput.Core;
@@ -20,20 +21,26 @@ namespace SyntheticInput
         public SyntheticInputManager(InputSettings settings)
         {
             if (settings.Process == null)
-                throw new ArgumentException("Process property in InputSettings cannot be null.");
+                throw new ArgumentException("Process property in InputSettings is null.");
             _settings = settings;
             _keystrokeProcessor = new KeystrokeProcessor(_settings);
         }
 
         // Public methods
-        public async Task Write(string content)
+        public async Task WriteString(string content)
         {
             // Go through each character in our string and let the KeystrokeProcessor process it
             foreach (char c in content)
             {
-                // Process the keystroke
-                await _keystrokeProcessor.ProcessKeystroke(c);
+                // Send the keystroke
+                await _keystrokeProcessor.SendKeystroke(c);
             }
+        }
+
+        public async Task SendKeystroke(VirtualKeys key)
+        {
+            // Send the keystroke
+            await _keystrokeProcessor.SendKeystroke(key);
         }
     }
 }
