@@ -3,7 +3,7 @@ using System.Runtime.InteropServices;
 
 namespace SyntheticInput.Core
 {
-    public class Win32
+    public static class Win32
     {
         // Windows API
         public const int KEYEVENTF_EXTENDEDKEY = 0x1;
