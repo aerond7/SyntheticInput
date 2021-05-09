@@ -1,10 +1,6 @@
 ﻿using System;
-using System.Diagnostics;
-using System.IO;
-using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 using SyntheticInput.Core;
-using SyntheticInput.Exceptions;
 
 namespace SyntheticInput
 {
@@ -27,20 +23,44 @@ namespace SyntheticInput
         }
 
         // Public methods
+        /// <summary>
+        /// Writes an entire string.
+        /// </summary>
+        /// <param name="content">The string to be written.</param>
         public async Task WriteString(string content)
         {
             // Go through each character in our string and let the KeystrokeProcessor process it
-            foreach (char c in content)
+            for (int i = 0; i < content.Length; i++)
             {
                 // Send the keystroke
-                await _keystrokeProcessor.SendKeystroke(c);
+                await _keystrokeProcessor.SendKeystroke(content[i]);
             }
         }
 
+        /// <summary>
+        /// Sends a single keystroke.
+        /// </summary>
+        /// <param name="key">The keystroke to be sent.</param>
         public async Task SendKeystroke(VirtualKeys key)
         {
             // Send the keystroke
             await _keystrokeProcessor.SendKeystroke(key);
+        }
+
+        /// <summary>
+        /// Sends CTRL + C input to the assigned process.
+        /// </summary>
+        public async Task CopyToClipboard()
+        {
+            await _keystrokeProcessor.Copy();
+        }
+
+        /// <summary>
+        /// Sends CTRL + V input to the assigned process.
+        /// </summary>
+        public async Task PasteFromClipboard()
+        {
+            await _keystrokeProcessor.Paste();
         }
     }
 }

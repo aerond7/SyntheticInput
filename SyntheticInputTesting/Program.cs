@@ -1,32 +1,36 @@
 ﻿using System;
-using System.Threading.Tasks;
 using SyntheticInput;
 using SyntheticInput.Core;
+using System.Windows.Forms;
 
 namespace SyntheticInputTesting
 {
     class Program
     {
+        [STAThread]
         static void Main(string[] args)
         {
-            InputTester();
-            Console.ReadLine();
+            Console.WriteLine("Type the name of the process to hook into:");
+            string procName = Console.ReadLine();
+            do
+            {
+                InputTester(procName);
+            } while (true);
         }
 
-        static async void InputTester()
+        static void InputTester(string procName)
         {
             var input = new SyntheticInputManager(new InputSettings
             {
-                Process = ProcessHelper.GetProcessByName("TheIsleClient-Win64-Shipping")
+                Process = ProcessHelper.GetProcessByName(procName),
+                DelayBetweenKeyPresses = 1,
+                MultiplyDelayOnCapsOrShift = true,
+                DelayMultiplier = 2
             });
-
-            Console.WriteLine("Input string:");
+            Console.WriteLine("String written to the process:");
             string str = Console.ReadLine();
-            await input.WriteString(str);
-
-            await Task.Delay(1000);
-
-            await input.SendKeystroke(VirtualKeys.Return);
+            //Clipboard.SetText(str);
+            input.WriteString(str);
         }
     }
 }

@@ -1,7 +1,4 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace SyntheticInput.Core
@@ -18,27 +15,11 @@ namespace SyntheticInput.Core
             ON = 1
         }
 
-        private enum ShiftState
+        private enum ToggleKeyState
         {
             Released = 0,
             Pressed = 1
         }
-
-        // Windows API
-        const int KEYEVENTF_EXTENDEDKEY = 0x1;
-        const int KEYEVENTF_KEYUP = 0x2;
-        const UInt32 WM_KEYDOWN = 0x0100;
-        const UInt32 WM_KEYUP = 0x0101;
-        [DllImport("user32.dll")]
-        static extern bool PostMessage(IntPtr hWnd, UInt32 Msg, int wParam, int lParam);
-        [DllImport("user32.dll")]
-        static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
-        [DllImport("user32.dll", CharSet = CharSet.Auto, ExactSpelling = true, CallingConvention = CallingConvention.Winapi)]
-        public static extern short GetKeyState(int keyCode);
-        [DllImport("user32.dll")]
-        static extern short VkKeyScan(char ch);
-        [DllImport("user32.dll")]
-        static extern int MapVirtualKey(int uCode, uint uMapType);
 
         // Variables
         private InputSettings _settings;
@@ -52,7 +33,7 @@ namespace SyntheticInput.Core
         private Task SetCapslockState(CapsLockState state)
         {
             // Get the current state of caps lock
-            bool currentlyEnabled = (((ushort)GetKeyState(0x14)) & 0xffff) != 0;
+            bool currentlyEnabled = (((ushort)Win32.GetKeyState(0x14)) & 0xffff) != 0;
 
             // Compare the requested state and the current state of caps lock
             // If the current state is the same as the requested state, return the function, otherwise continue
@@ -69,21 +50,35 @@ namespace SyntheticInput.Core
             }
 
             // Toggle the caps lock key
-            keybd_event((int)VirtualKeys.CapsLock, (byte)MapVirtualKey((int)VirtualKeys.CapsLock, 0), KEYEVENTF_EXTENDEDKEY, (UIntPtr)0);
-            keybd_event((int)VirtualKeys.CapsLock, (byte)MapVirtualKey((int)VirtualKeys.CapsLock, 0), KEYEVENTF_EXTENDEDKEY | KEYEVENTF_KEYUP, (UIntPtr)0);
+            Win32.keybd_event((int)VirtualKeys.CapsLock, (byte)Win32.MapVirtualKey((int)VirtualKeys.CapsLock, 0), Win32.KEYEVENTF_EXTENDEDKEY, (UIntPtr)0);
+            Win32.keybd_event((int)VirtualKeys.CapsLock, (byte)Win32.MapVirtualKey((int)VirtualKeys.CapsLock, 0), Win32.KEYEVENTF_EXTENDEDKEY | Win32.KEYEVENTF_KEYUP, (UIntPtr)0);
 
             return Task.CompletedTask;
         }
 
-        private Task SetShiftState(ShiftState state)
+        private Task SetShiftState(ToggleKeyState state)
         {
             switch (state)
             {
-                case ShiftState.Pressed:
-                    keybd_event((byte)VirtualKeys.LeftShift, (byte)MapVirtualKey((int)VirtualKeys.LeftShift, 0), KEYEVENTF_EXTENDEDKEY | 0, (UIntPtr)0);
+                case ToggleKeyState.Pressed:
+                    Win32.keybd_event((byte)VirtualKeys.LeftShift, (byte)Win32.MapVirtualKey((int)VirtualKeys.LeftShift, 0), Win32.KEYEVENTF_EXTENDEDKEY | 0, (UIntPtr)0);
                     break;
-                case ShiftState.Released:
-                    keybd_event((byte)VirtualKeys.LeftShift, (byte)MapVirtualKey((int)VirtualKeys.LeftShift, 0), KEYEVENTF_KEYUP, (UIntPtr)0);
+                case ToggleKeyState.Released:
+                    Win32.keybd_event((byte)VirtualKeys.LeftShift, (byte)Win32.MapVirtualKey((int)VirtualKeys.LeftShift, 0), Win32.KEYEVENTF_KEYUP, (UIntPtr)0);
+                    break;
+            }
+            return Task.CompletedTask;
+        }
+
+        private Task SetCtrlState(ToggleKeyState state)
+        {
+            switch (state)
+            {
+                case ToggleKeyState.Pressed:
+                    Win32.keybd_event((byte)VirtualKeys.LeftControl, (byte)Win32.MapVirtualKey((int)VirtualKeys.LeftControl, 0), Win32.KEYEVENTF_EXTENDEDKEY | 0, (UIntPtr)0);
+                    break;
+                case ToggleKeyState.Released:
+                    Win32.keybd_event((byte)VirtualKeys.LeftControl, (byte)Win32.MapVirtualKey((int)VirtualKeys.LeftControl, 0), Win32.KEYEVENTF_KEYUP, (UIntPtr)0);
                     break;
             }
             return Task.CompletedTask;
@@ -107,34 +102,77 @@ namespace SyntheticInput.Core
         }
 
         // Public methods
+        /// <summary>
+        /// Sends a WM_KEYDOWN command to the assigned process.
+        /// </summary>
+        /// <param name="key">VirtualKey which will be the keystroke.</param>
         public async Task SendKeystroke(VirtualKeys key)
         {
             // Send the character keystroke to the process
-            PostMessage(_settings.Process.MainWindowHandle, WM_KEYDOWN, (int)key, 0);
+            Win32.PostMessage(_settings.Process.MainWindowHandle, Win32.WM_KEYDOWN, (int)key, 0);
             // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called in a loop)
             await Task.Delay(_settings.DelayBetweenKeyPresses);
         }
 
+        /// <summary>
+        /// Sends a WM_KEYDOWN command to the assigned process.
+        /// </summary>
+        /// <param name="c">Character which will be turned into the keystore.</param>
+        /// <param name="next">The next character in a loop (if available).</param>
         public async Task SendKeystroke(char c)
         {
+            // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called multiple times in a short timeframe)
+            await Task.Delay(_settings.DelayBetweenKeyPresses);
             // Check if the character is capital and if it's a symbol
             bool isUpper = char.IsUpper(c);
             bool isSymbol = await IsSymbol(c);
+            // Check if settings requires us to apply delay on use of control keys (caps lock, shift)
+            bool delayControlKeys = _settings.MultiplyDelayOnCapsOrShift && (isSymbol || isUpper);
+            // Assign our control key delay value and calculate using the multiplier if required
+            int delayControlPress = _settings.DelayBetweenKeyPresses;
+            if (delayControlKeys)
+                delayControlPress = _settings.DelayBetweenKeyPresses * _settings.DelayMultiplier;
             // If the character is capital, request to turn on caps lock, otherwise turn it off
             if (isUpper)
-                await SetCapslockState(CapsLockState.ON);
-            else
-                await SetCapslockState(CapsLockState.OFF);
+                await SetCapslockState(CapsLockState.ON); else await SetCapslockState(CapsLockState.OFF);
             // If the character is symbol, press left shift to print the symbol
             if (isSymbol)
-                await SetShiftState(ShiftState.Pressed);
+                await SetShiftState(ToggleKeyState.Pressed);
+            // Delay for control keys (caps lock, shift) to take effect properly
+            if (delayControlKeys)
+                await Task.Delay(delayControlPress);
             // Send the character keystroke to the process
-            PostMessage(_settings.Process.MainWindowHandle, WM_KEYDOWN, VkKeyScan(c), 0);
+            Win32.PostMessage(_settings.Process.MainWindowHandle, Win32.WM_KEYDOWN, Win32.VkKeyScan(c), 0);
+            // Delay for control keys (caps lock, shift) to take effect properly
+            if (delayControlKeys)
+                await Task.Delay(delayControlPress);
             // Release left shift
             if (isSymbol)
-                await SetShiftState(ShiftState.Released);
+                await SetShiftState(ToggleKeyState.Released);
             // Turn off caps lock
             await SetCapslockState(CapsLockState.OFF);
+            // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called multiple times in a short timeframe)
+            await Task.Delay(_settings.DelayBetweenKeyPresses);
+        }
+
+        /// <summary>
+        /// Sends a WM_COPY command to the assigned process.
+        /// </summary>
+        public async Task Copy()
+        {
+            // Send the command
+            Win32.PostMessage(_settings.Process.MainWindowHandle, Win32.WM_COPY, 0, 0);
+            // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called in a loop)
+            await Task.Delay(_settings.DelayBetweenKeyPresses);
+        }
+
+        /// <summary>
+        /// Sends a WM_PASTE command to the assigned process.
+        /// </summary>
+        public async Task Paste()
+        {
+            // Send the command
+            Win32.PostMessage(_settings.Process.MainWindowHandle, Win32.WM_PASTE, 0, 0);
             // Delay between keystrokes, ensures that any next input is after this one and not before (in case this method is called in a loop)
             await Task.Delay(_settings.DelayBetweenKeyPresses);
         }
